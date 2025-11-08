@@ -1,0 +1,513 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MQTT Over WebSockets</title>
+  <link rel="stylesheet" href="subscriber.css">
+  <script src="https://unpkg.com/mqtt@5.0.0/dist/mqtt.min.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+ 
+
+
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #f6f3f7, #b5f3f7);
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    h1 { text-align:center; margin:20px 0; color:#3dc0c0; }
+     .screen {
+      display: none;
+      margin-top: 40px;
+      padding: 20px;
+    }
+    .screen.active { display: block; }
+
+    .menu-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: center;
+      margin-top: 40px;
+    }
+
+    .menu-buttons button {
+      padding: 14px 20px;
+      font-size: 18px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      color: white;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .menu-buttons button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(255,255,255,0.4);
+    }
+
+    .back-btn {
+      background: #64748b;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .back-btn:hover { background: #475569; }
+
+
+    /* Tabs */
+    .tabs {
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      background:#58c694;
+      padding:10px;
+    }
+    .tabs button {
+      background:#f41111cc;
+      border:none;
+      padding:10px 18px;
+      border-radius:8px;
+      font-weight:600;
+      cursor:pointer;
+    }
+    .tabs button.active {
+      background:#91e8ef;
+      color:white;
+    }
+    .tab-content { display:none; padding:20px; }
+    .tab-content.active { display:block; }
+
+    /* Cards */
+    .status-cards {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+      gap:15px;
+      margin-bottom:20px;
+      .card .icon {
+  display: flex;
+  justify-content: center;
+  gap: 10px; /* khoảng cách giữa hai ảnh */
+  margin-bottom: 10px;
+}
+
+.card .icon img {
+  width: 90px;
+  height: auto;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.card .icon img:hover {
+  transform: scale(1.1);
+  opacity: 0.9;
+}
+    }
+    
+      .card:nth-child(1) { background: linear-gradient(135deg,#fef3c7,#87cae3);color:#78350f;
+      
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 4px 12px rgba(236, 237, 168, 0.06);
+      text-align:center;
+        
+     } /* Độ ẩm */
+.card:nth-child(2) { background:linear-gradient(135deg,#fff7ed,#f5f79e);color:#78350f;
+
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.06);
+      text-align:center; } /* Đèn */
+.card:nth-child(3) { background:linear-gradient(135deg,#dcfce7,#76cf96);color:#78350f;
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.06);
+      text-align:center; } /* Số người */
+.card:nth-child(4) { background:linear-gradient(135deg,#e0f2fe,#76c7ec);color:#78350f;
+
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.06);
+      text-align:center;} /* Quạt */
+
+     
+    
+    .card .icon{font-size:36px;margin-bottom:8px;}
+    .value { font-size:20px; font-weight:700; }
+    .badge-on{color:#dee698;font-weight:700;} .badge-off{color:#c8abe0;font-weight:700;}
+
+    
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 18px;
+}
+
+.controls button {padding: 10px 12px;border-radius: 8px; border: none;cursor: pointer;color: white;font-weight: 600;opacity: 0.85;transition: transform 0.3s, opacity 0.3s;
+}
+
+/* Khi rê chuột vào nút */
+.controls button:hover {
+  transform: scale(1.05);
+  opacity: 1;
+}
+
+/* Khi nhấn giữ nút */
+.controls button:active {
+  box-shadow: 0 0 12px rgba(255,255,255,0.6);
+  transform: scale(0.95);
+}
+
+
+    #fanOn{background:#16a34a;} #fanOff{background:#dc2626;}
+    #lightOn{background:#1c45af;} #lightOff{background:#e8161d;}
+
+    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    th,td{border:1px solid #87b5e2;padding:8px;text-align:center;}
+    th{background:#bd87e1;}
+
+    #envChart{width:100%;max-height:260px;}
+    textarea{width:100%;min-height:120px;margin-top:10px;border-radius:8px;padding:10px;font-family:monospace;border:1px solid #cbd5e1;}
+
+    /* Snow effect */
+    /* canvas#snow {
+      position:fixed;
+      top:0; left:0;
+      width:100%; height:100%;
+      pointer-events:none;
+      z-index:1;
+       filter: brightness(1.1) blur(0.3px);
+    } */
+  </style>
+</head>
+<body>
+  <script>
+  const chartCtx = document.getElementById("envChart").getContext("2d");
+  const myChart = new Chart(chartCtx, { ... });
+</script>
+  <!-- Hiệu ứng tuyết -->
+   <style>
+  /* Canvas tuyết rơi */
+  #snow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Không chặn chuột hay biểu đồ */
+    z-index: 1; /* Nằm trên cùng */
+  }
+</style>
+
+   
+  <!-- Canvas cho hiệu ứng tuyết -->
+<canvas id="snow"></canvas>
+
+
+
+  
+
+  <h1>QUẢN LÝ LỚP HỌC</h1>
+   <!-- Topic control -->
+    
+    <!-- ========== MÀN HÌNH CHỌN ========== -->
+  <div id="menu-screen" class="screen active">
+    <h2>Chọn chức năng</h2>
+    <div class="menu-buttons">
+      <button onclick="showScreen('student')">📋 Danh sách sinh viên</button>
+      <button onclick="showScreen('environment')">🌡️ Môi trường lớp học</button>
+    </div>
+  </div>
+   <!-- ========== MÀN HÌNH DANH SÁCH SINH VIÊN ========== -->
+  <div id="student-screen" class="screen">
+    <button class="back-btn" onclick="showScreen('menu')">⬅ Quay lại</button>
+    <h2>📋 Danh sách sinh viên</h2>
+    <table>
+      <thead>
+        <tr><th>MSSV</th><th>Họ tên</th><th>Điểm danh</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>2023001</td><td>Nguyễn Văn A</td><td>Có mặt</td></tr>
+        <tr><td>2023002</td><td>Trần Thị B</td><td>Vắng</td></tr>
+        <tr><td>2023003</td><td>Lê Văn C</td><td>Có mặt</td></tr>
+      </tbody>
+    </table>
+  </div>
+   <!-- ========== MÀN HÌNH MÔI TRƯỜNG LỚP HỌC ========== -->
+  <div id="environment-screen" class="screen">
+    <button class="back-btn" onclick="showScreen('menu')">⬅ Quay lại</button>
+    <h2>🌡️ Môi trường lớp học</h2>
+
+    <div class="cards">
+      <div class="card">
+        <img src="nhietdo1.png" alt="temperature">
+        <h4>Nhiệt độ</h4>
+        <div id="temperature">-- °C</div>
+      </div>
+
+      <div class="card">
+        <img src="people.png" alt="people">
+        <h4>Số người</h4>
+        <div id="songuoi">--</div>
+      </div>
+    </div>
+
+    <canvas id="envChart" width="400" height="200"></canvas>
+  </div>
+
+  <script>
+    // ========== Hiển thị / Ẩn các màn hình ==========
+    function showScreen(name) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      if (name === 'student') document.getElementById('student-screen').classList.add('active');
+      else if (name === 'environment') document.getElementById('environment-screen').classList.add('active');
+      else document.getElementById('menu-screen').classList.add('active');
+    }
+
+
+
+ <div class="topic-actions">
+    <input id="topic" type="text" placeholder="Nhập topic (ví dụ: classroom/data)" style="flex:2">
+    <button id="subscribe">Subscribe</button>
+    <button id="unsubscribe">Unsubscribe</button>
+    <input id="status" readonly style="width:120px;text-align:center;font-weight:700;">
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="classlist">Danh sách lớp</button>
+  </div>
+
+  <!-- Dashboard Tab -->
+  <div id="dashboard" class="tab-content active">
+    <div class="status-cards">
+      <div class="card">
+        <div class="icon">
+           <img src="nhietdo.png" alt="temperature" width="90">
+           </div>
+
+          <h4>Nhiệt độ</h4>
+        <div id="temperature" class="value"> </div>
+       
+      </div>
+      <div class="card">
+        <div class="icon"><img src="đèn1.png" alt="temperature" width="90">
+           </div>
+           <h4>Đèn</h4>
+        <div id="lightStatus" class="value badge-off"></div>
+      
+      </div>
+      <div class="card">
+        <div class="icon"><img src="nguoi1.png" alt="people" width="90">
+      </div>
+        <h4>Số người</h4>
+        <div id="songuoi" class="value"></div>
+       
+      </div>
+      <div class="card">
+        <div class="icon"><img src="caiquat1.png" alt="fan" width="80">
+  </div>
+        <h4>Quạt</h4>
+        <div id="fanStatus" class="value badge-off"></div>
+        
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="lightOn">Light ON</button>
+      <button id="lightOff">Light OFF</button>
+      <button id="fanOn">Fan ON</button>
+      <button id="fanOff">Fan OFF</button>
+    </div>
+    
+
+    <h2>Temperature & People</h2>
+    <canvas id="envChart"></canvas>
+
+    <h2>Messages</h2>
+    <label for="message">Message</label>
+      <textarea id="message"  readonly></textarea>
+    
+  </div>
+
+  <!-- Classlist Tab -->
+  <div id="classlist" class="tab-content">
+    <h2>Danh sách lớp học</h2>
+    <table>
+     
+     
+    <thead>
+      <tr><th>MSSV</th><th>Tên</th><th>Điểm danh</th></tr>
+    </thead>
+    <tbody id="students-body"></tbody>
+  </table>
+</div>
+  <script>
+   
+  
+
+
+ 
+/* Tab switching */
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  }
+});
+
+/* Chart setup */
+const chartCanvas = document.getElementById('envChart');
+const chartCtx = chartCanvas.getContext('2d');
+let labels = [], temperatureData = [], peopleData = [];
+
+const envChart = new Chart(chartCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'temperature(°C)', data: temperatureData, borderColor: '#ef4444', fill: false },
+      { label: 'People', data: peopleData, borderColor: '#10b981', fill: false, yAxisID: 'y1' }
+    ]
+  },
+  options: {
+    scales: {
+      y: { beginAtZero: false },
+      y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+    }
+  }
+});
+window.envChart = envChart;
+
+function updatetemperature(t){
+  document.getElementById("temperature").textContent = t + " °C";
+  pushChart(t, null);
+}
+function updatePeople(p){
+  document.getElementById("songuoi").textContent = p;
+  pushChart(null, p);
+}
+function updateLightStatus(val){
+  const el = document.getElementById("lightStatus");
+  el.textContent = val;
+  el.className = "value " + (val === "ON" ? "badge-on" : "badge-off");
+}
+function updateFanStatus(val){
+  const el = document.getElementById("fanStatus");
+  el.textContent = val;
+  el.className = "value " + (val === "ON" ? "badge-on" : "badge-off");
+}
+
+function pushChart(temp, people){
+  const now = new Date().toLocaleTimeString();
+  if (labels.length >= 20) { labels.shift(); temperatureData.shift(); peopleData.shift(); }
+  labels.push(now);
+  temperatureData.push(temp ?? (temperatureData.length ? temperatureData[temperatureData.length - 1] : null));
+  peopleData.push(people ?? (peopleData.length ? peopleData[peopleData.length - 1] : 0));
+  envChart.update();
+}
+
+/* ❄ Snow effect (đã sửa) */
+const snowCanvas = document.getElementById("snow");
+const ctxSnow = snowCanvas.getContext("2d");
+
+function resizeSnowCanvas() {
+  snowCanvas.width = window.innerWidth;
+  snowCanvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resizeSnowCanvas);
+resizeSnowCanvas();
+
+const snowflakes = [];
+const maxSnowflakes = 120;
+
+for (let i = 0; i < maxSnowflakes; i++) {
+  snowflakes.push({
+    x: Math.random() * snowCanvas.width,
+    y: Math.random() * snowCanvas.height,
+    radius: Math.random() * 3 + 1,
+    speedY: Math.random() * 1 + 0.5,
+    speedX: Math.random() * 0.5 - 0.25,
+    opacity: Math.random() * 0.7 + 0.3
+  });
+}
+
+function drawSnow() {
+  ctxSnow.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
+  for (let flake of snowflakes) {
+    ctxSnow.beginPath();
+    ctxSnow.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+    ctxSnow.fillStyle = `rgba(255, 255, 255, ${flake.opacity})`;
+    ctxSnow.fill();
+
+    flake.y += flake.speedY;
+    flake.x += flake.speedX;
+
+    if (flake.y > snowCanvas.height) {
+      flake.y = -flake.radius;
+      flake.x = Math.random() * snowCanvas.width;
+    }
+  }
+  requestAnimationFrame(drawSnow);
+}
+
+drawSnow();
+</script>
+
+
+  <script src="subscriber.js"></script>
+</body>
+</html>

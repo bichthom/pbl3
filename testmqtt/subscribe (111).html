@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QUAN LY LOP HOC</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- MQTT.js -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <!-- Custom JS -->
+  <script src="subscriber.js" defer></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+    .wrapper {
+      max-width: 1200px;
+      margin: auto;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    .status-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      text-align: center;
+      font-size: 1.1em;
+    }
+    .card label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    .card input {
+      width: 100%;
+      padding: 8px;
+      text-align: center;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-weight: bold;
+    }
+    .temperature { background: #ffe0e0; }
+    .humidity { background: #e0f7ff; }
+    .people { background: #e6ffe0; }
+    .fan { background: #fff5e0; }
+    .actions, .topic-actions {
+      margin: 15px 0;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .actions button, .topic-actions button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+    }
+    #subscribe { background: #007bff; }
+    #unsubscribe { background: #dc3545; }
+    #fanOn { background: #28a745; }
+    #fanOff { background: #d9534f; }
+    #exportCSV { background: #17a2b8; }
+    #simulate { background: #6c757d; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      margin-top: 10px;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>QUAN LY LOP HOC</h1>
+
+    <!-- Topic control -->
+    <div class="topic-actions">
+      <input type="text" id="topic" placeholder="Enter topic (e.g., classroom/env)" style="flex:2; padding:10px; border-radius:6px; border:1px solid #ccc;">
+      <button id="subscribe">Subscribe</button>
+      <button id="unsubscribe">Unsubscribe</button>
+    </div>
+
+    <!-- Status cards -->
+    <div class="status-cards">
+      <div class="card temperature">
+        <label>Nhiệt độ</label>
+        <input type="text" id="temperature" value="N/A" readonly />
+      </div>
+      <div class="card humidity">
+        <label>Độ ẩm</label>
+        <input type="text" id="doam" value="N/A" readonly />
+      </div>
+      <div class="card people">
+        <label>Số người</label>
+        <input type="text" id="songuoi" value="N/A" readonly />
+      </div>
+      <div class="card fan">
+        <label>Quạt</label>
+        <input type="text" id="fanStatus" value="Fan: OFF" readonly />
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="actions">
+      <button id="fanOn">Fan ON</button>
+      <button id="fanOff">Fan OFF</button>
+      <button id="exportCSV">Export CSV</button>
+      <button id="simulate">Simulate</button>
+    </div>
+
+    <!-- Class list -->
+    <h2>Class List</h2>
+    <table id="classList">
+      <thead>
+        <tr>
+          <th>Student ID</th>
+          <th>Name</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <!-- Chart -->
+    <h2>Temperature & Humidity</h2>
+    <canvas id="envChart"></canvas>
+
+    <!-- Messages -->
+    <h2>Messages</h2>
+    <textarea id="message" readonly></textarea>
+  </div>
+</body>
+</html>
